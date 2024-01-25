@@ -27,7 +27,8 @@ int main(int argc, char **argv) {
 static void Test1(const char *fname) {
     fprintf(stderr, "Now trying '%s'\n", fname);
 
-    File f= SPIFFS.open(fname, "r");	// Open source file
+    File f= SPIFFS.open(fname, "r");
+    Tar<FS> tar(&SPIFFS);
 }
 #if 0
 Tar<FS> tar(&SPIFFS);			// Declare and initialize class passing pointer to SPIFFS as target filesystem

@@ -42,7 +42,10 @@ class Tar {
 public:
 	Tar(T* dst) {
 		FSC = dst;
-		pathprefix = "";
+		pathprefix = NULL;
+	}
+	~Tar() {
+		if (pathprefix) free(pathprefix);
 	}
 	void dest(char* path);		// Set directory extract to. tar -C  
 	void open(Stream* src);		// Source stream. Can use (Stream*)File as source
@@ -90,17 +93,24 @@ void Tar<T>::onEof(cbTarEof cb){
 	cbEof = cb;
 }
 #endif
+
 template <typename T>
 void Tar<T>::dest(char* path){
-	pathprefix = (char*)malloc (strlen(path) + 1);
+	if (pathprefix) {
+		free (pathprefix);
+		pathprefix= NULL;
+	}
+	if (path && *path) {
+		pathprefix = (char*)malloc (strlen(path) + 1);
 		if (pathprefix != NULL) {
 			strcpy (pathprefix, path);
 		} else {
 			#ifndef TAR_SILENT
 			Serial.println("Memory allocation error");
 			#endif
-			pathprefix = "";
-     	}
+			pathprefix= NULL;
+		}
+	}
 }
 
 template <typename T>
@@ -247,15 +257,18 @@ void Tar<T>::extract()
 				_state = TAR_CHECKSUM_MISMACH;
 				return;
 			}
-			fullpath = (char*)malloc (strlen(pathprefix) + strlen(buff) + 1);
+			size_t fullpathlen= (pathprefix? strlen(pathprefix): 0)
+					  + strlen(buff) + 1;
+			fullpath= (char *)malloc (fullpathlen);
 			if (fullpath == NULL) {
 				#ifndef TAR_SILENT
 				Serial.println("* Memory allocation error. Ignoring entry");
 				#endif
-     		} else {
-     			_state = TAR_IDLE;
+			} else {
+				_state = TAR_IDLE;
 				//filesize = parseoct(buff + 124, 12);
-				strcpy (fullpath, pathprefix);
+				fullpath[0]= '\0';
+				if (pathprefix) strcpy (fullpath, pathprefix);
 				strcat (fullpath, buff);
 				switch (buff[156]) {
 				case '1':

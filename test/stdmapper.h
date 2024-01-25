@@ -103,7 +103,7 @@ public:
 
 Stream Serial(stdout, "Serial-stdout", true);
 
-class TSPIFFS {
+class FS {
 public:
     File open(const char *name, const char *mode) {
         FILE *f= fopen(name, mode);
@@ -117,6 +117,6 @@ public:
     }
 };
 
-TSPIFFS SPIFFS;
+FS SPIFFS;
 
 #endif
