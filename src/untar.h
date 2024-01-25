@@ -47,7 +47,7 @@ public:
 	~Tar() {
 		if (pathprefix) free(pathprefix);
 	}
-	void dest(char* path);		// Set directory extract to. tar -C  
+	void dest(const char* path);	// Set directory extract to. tar -C  
 	void open(Stream* src);		// Source stream. Can use (Stream*)File as source
 	void extract();			// Extract a tar archive
 	#ifdef TAR_CALLBACK
@@ -95,7 +95,7 @@ void Tar<T>::onEof(cbTarEof cb){
 #endif
 
 template <typename T>
-void Tar<T>::dest(char* path){
+void Tar<T>::dest(const char* path){
 	if (pathprefix) {
 		free (pathprefix);
 		pathprefix= NULL;
@@ -188,14 +188,14 @@ File* Tar<T>::create_file(char *pathname, int mode)
 	f = new File();
 	*f = FSC->open(pathname, "w+");
 	#ifdef TAR_MKDIR
-	if (f == NULL) {
+	if (!f->isOpen()) {
 		/* Try creating parent dir and then creating file. */
 		char *p = strrchr(pathname, '/');
 		if (p != NULL) {
 			*p = '\0';
 			create_dir(pathname, 0755);
 			*p = '/';
-			f = FSC->open(pathname, "w+");
+			*f = FSC->open(pathname, "w+");
 		}
 	}
 	#endif

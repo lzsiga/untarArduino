@@ -12,6 +12,9 @@ static void Test1(const char *fname);
 int main(int argc, char **argv) {
     progname= argv[0];
 
+    Serial.begin(74880);
+    SPIFFS.begin();
+
     if (argc>1) {
         int i;
 
@@ -27,9 +30,17 @@ int main(int argc, char **argv) {
 static void Test1(const char *fname) {
     fprintf(stderr, "Now trying '%s'\n", fname);
 
-    File f= SPIFFS.open(fname, "r");
     Tar<FS> tar(&SPIFFS);
+
+    File f= SPIFFS.open(fname, "r");
+    if (!f) {
+        return;
+    }
+    tar.open(&f);
+    tar.dest("./");
+    tar.extract();
 }
+
 #if 0
 Tar<FS> tar(&SPIFFS);			// Declare and initialize class passing pointer to SPIFFS as target filesystem
 
