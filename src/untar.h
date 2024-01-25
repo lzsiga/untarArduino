@@ -162,11 +162,12 @@ void Tar<T>::create_dir(char *pathname, int mode)
 			r = FSC->mkdir(pathname, mode);
 		}
 	}
-	if (r != 0)
-		#ifndef TAR_SILENT
-		Serial.print("Could not create directory %s");
+#ifndef TAR_SILENT
+	if (r != 0) {
+		Serial.print("Could not create directory ");
 		Serial.println(pathname);
-		#endif
+        }
+#endif
 }
 #endif
 
