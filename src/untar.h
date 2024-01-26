@@ -360,6 +360,7 @@ void Tar<T>::extract()
 					#endif
 					_state = TAR_WRITE_ERROR;
 					f->close();
+					delete f;
 					f = NULL;
 				}
 			}
@@ -375,6 +376,7 @@ void Tar<T>::extract()
 			Serial.println();
 			#endif
 			f->close();
+			delete f;
 			f = NULL;
 		}
 		_state = TAR_DONE;
