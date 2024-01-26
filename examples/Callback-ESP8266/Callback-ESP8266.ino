@@ -29,9 +29,9 @@
 
 Tar<FS> tar(&SPIFFS);
 bool fWrite = false;
-char* filename = EXTRACT;
+const char* filename = EXTRACT;
 
-bool printFile(char* name) {
+bool printFile(const char* name) {
 	Serial.print(name);
 	if (strcmp(name, filename) == 0) {
 		Serial.println();
@@ -41,7 +41,8 @@ bool printFile(char* name) {
 	Serial.println(" -  SKIP");
 	return false;
 }
-void blinkWrite(char* data, size_t s) {
+
+void blinkWrite(const char* data, size_t s) {
 	if (!fWrite) return;
 	digitalWrite(PIN, !digitalRead(PIN));	
 }
