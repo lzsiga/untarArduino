@@ -24,7 +24,9 @@
 
 #define PIN D4
 
+#ifndef FILENAME
 #define FILENAME "/test.tar"
+#endif
 #define EXTRACT "data/create.txt"
 
 Tar<FS> tar(&SPIFFS);
@@ -43,8 +45,10 @@ bool printFile(const char* name) {
 }
 
 void blinkWrite(const char* data, size_t s) {
+	(void)data;
+	(void)s;
 	if (!fWrite) return;
-	digitalWrite(PIN, !digitalRead(PIN));	
+	digitalWrite(PIN, !digitalRead(PIN));
 }
 
 void eof() {
@@ -57,8 +61,8 @@ void setup() {
   pinMode(PIN, OUTPUT);
   digitalWrite(PIN, HIGH);
   SPIFFS.begin();
-  tar.onFile(printFile);
-  tar.onData(blinkWrite);
+  tar.onFile((cbTarProcess)printFile);
+  tar.onData((cbTarData)blinkWrite);
   tar.onEof(eof);
   File f = SPIFFS.open(FILENAME, "r");
   if (f) {

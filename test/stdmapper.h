@@ -192,4 +192,13 @@ public:
 
 FS SPIFFS;
 
+/* No idea, but maybe not absolutely necessary for valgrind-ing */
+#define HIGH 1
+#define D4   4
+#define OUTPUT 1
+
+int  digitalRead(int)       { return 0; }
+void digitalWrite(int, int) { return; }
+void pinMode(int, int)      { return; }
+
 #endif
