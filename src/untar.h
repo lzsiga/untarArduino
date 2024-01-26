@@ -62,7 +62,7 @@ private:
 	#ifdef TAR_MKDIR
 	void create_dir(char *pathname, int mode);	// Create a directory, including parent directories as necessary.
 	#endif
-	File *create_file(char *pathname, int mode);	// Create a file, including parent directory as necessary.
+	File *create_file(char *pathname);		// Create a file, including parent directory as necessary.
 	int verify_checksum(const char *p);		// Verify the tar checksum.
 	T* FSC;						// FS object
 	Stream* source;					// Source stream
@@ -174,15 +174,16 @@ void Tar<T>::create_dir(char *pathname, int mode)
 	}
 #ifndef TAR_SILENT
 	if (r != 0) {
-		Serial.print("Could not create directory ");
-		Serial.println(pathname);
+		Serial.print("Could not create directory '");
+		Serial.print(pathname);
+		Serial.println("'");
         }
 #endif
 }
 #endif
 
 template <typename T>
-File* Tar<T>::create_file(char *pathname, int mode)
+File* Tar<T>::create_file(char *pathname)
 {
 	File* f;
 	f = new File();
@@ -324,12 +325,13 @@ void Tar<T>::extract()
 					filesize = parseoct(buff + 124, 12);
 					_state = TAR_FILE_EXTRACT;
 					#ifdef TAR_CALLBACK
-					if (cbProcess == NULL || cbProcess(buff)) {
+					if (cbProcess == NULL || cbProcess(buff))
 					#endif
-						f = create_file(fullpath, parseoct(buff + 100, 8));
-					#ifdef TAR_CALLBACK
+					{
+						int ignored_fmode= parseoct(buff + 100, 8);
+						(void)ignored_fmode;
+						f = create_file(fullpath);
 					}
-					#endif
 					break;
 				}
 			}
