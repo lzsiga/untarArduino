@@ -28,27 +28,27 @@
 #define EXTRACT "data/create.txt"
 
 Tar<FS> tar(&SPIFFS);
-bool write = false;
+bool fWrite = false;
 char* filename = EXTRACT;
 
 bool printFile(char* name) {
 	Serial.print(name);
 	if (strcmp(name, filename) == 0) {
 		Serial.println();
-		write = true;
+		fWrite = true;
 		return true;
 	}
 	Serial.println(" -  SKIP");
 	return false;
 }
 void blinkWrite(char* data, size_t s) {
-	if (!write) return;
+	if (!fWrite) return;
 	digitalWrite(PIN, !digitalRead(PIN));	
 }
 
 void eof() {
   digitalWrite(PIN, HIGH);  
-	write = false;
+	fWrite = false;
 }
 
 void setup() {
