@@ -241,7 +241,7 @@ void Tar<T>::extract()
 			Serial.println(bytes_read);
 			#endif
 			_state = TAR_SHORT_READ;
-			return;
+			goto RETURN;
 		}
 		if (filesize == 0) {
 			if (is_end_of_archive(buff)) {
@@ -249,14 +249,14 @@ void Tar<T>::extract()
 				Serial.println("End of source file");
 				#endif
 				_state = TAR_SOURCE_EOF;
-				return;
+				goto RETURN;
 			}
 			if (!verify_checksum(buff)) {
 				#ifndef TAR_SILENT
 				Serial.println("* Checksum failure");
 				#endif
 				_state = TAR_CHECKSUM_MISMACH;
-				return;
+				goto RETURN;
 			}
 			size_t fullpathlen= (pathprefix? strlen(pathprefix): 0)
 					  + strlen(buff) + 1;
@@ -349,7 +349,7 @@ void Tar<T>::extract()
 				Serial.println(bytes_read);
 				#endif
 				_state = TAR_SHORT_READ;
-				return;
+				goto RETURN;
 			}
 			if (filesize < 512)
 				bytes_read = filesize;
@@ -380,11 +380,30 @@ void Tar<T>::extract()
 			f = NULL;
 		}
 		_state = TAR_DONE;
-		if (fullpath) free(fullpath);
+		if (fullpath) {
+			free(fullpath);
+			fullpath= NULL;
+		}
 		#ifdef TAR_CALLBACK
 		if (cbEof != NULL)
 			cbEof();
 		#endif
 		bytes_read = 0;
+	}
+RETURN:
+	if (f != NULL) {
+		#ifndef TAR_SILENT
+		Serial.println();
+		#endif
+		f->close();
+		delete f;
+		f = NULL;
+	}
+	if (fullpath) {
+		free(fullpath);
+		fullpath = NULL;
+	}
+	if (source!=NULL && source->isOpen()) {
+		source->close();
 	}
 }

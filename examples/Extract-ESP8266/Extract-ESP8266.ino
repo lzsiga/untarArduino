@@ -20,7 +20,9 @@
 #include <FS.h>
 #include <untar.h>
 
+#ifndef FILENAME
 #define FILENAME "/test.tar"
+#endif
 
 Tar<FS> tar(&SPIFFS);			// Declare and initialize class passing pointer to SPIFFS as target filesystem
 
