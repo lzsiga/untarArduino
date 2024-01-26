@@ -73,8 +73,8 @@ private:
 	#endif
 	char buff[512];
 	File *f = NULL;
-	size_t bytes_read;
-	int filesize;
+	size_t bytes_read = 0;
+	int filesize = 0;
 	tar_state _state = TAR_IDLE;
 };
 #ifdef TAR_CALLBACK
