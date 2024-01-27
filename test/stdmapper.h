@@ -16,29 +16,34 @@
 
 enum FileState {FiSt_NotOpened, FiSt_OpenFailed, FiSt_PreOpened, FiSt_Opened};
 
+#define FnameNVL(fname) ((fname)? (fname): "[noname]")
+
 class Stream {
 private:
     FILE *file;
     char *fname;
     FileState fstate;
+    size_t offs;
 
 public:
     Stream(FILE *pfile, const char *pfname, FileState pfstate) {
         file= pfile;              /* ownership taken */
         fname= strdup(pfname);    /* a copy  */
         fstate= pfstate;
+        offs= 0;
     }
 
     Stream() {
         file= NULL;
         fname= NULL;
         fstate= FiSt_NotOpened;
+        offs= 0;
     }
 
     ~Stream() {
         if (fstate==FiSt_Opened) {
             fprintf(stderr, "Stream.destructor *** file '%s' has never been closed\n",
-                    fname? fname: "[noname]");
+                    FnameNVL(fname));
             fclose(file);
             file= NULL;
             fstate= FiSt_NotOpened;
@@ -47,6 +52,7 @@ public:
             free(fname);
             fname= NULL;
         }
+        offs= 0;
     }
 
 /* more like a 'move' operator */
@@ -57,13 +63,16 @@ public:
             this->file= from.file;
             this->fname= from.fname;
             this->fstate= FiSt_Opened;
+            this->offs= from.offs;
             from.file= NULL;
             from.fname= NULL;
             from.fstate= FiSt_NotOpened;
+            from.offs= 0;
         } else {
             if (from.fname) {
                 this->fname= strdup(from.fname);
             }
+            this->offs= from.offs;
         }
         return *this;
     }
@@ -74,38 +83,41 @@ public:
 
     size_t readBytes(char *buff, size_t len) {
         size_t rdlen= fread(buff, 1, len, file);
-        fprintf(stderr, "readBytes(%d) read %d bytes from file '%s'\n",
-            (int)len, (int)rdlen, fname? fname: "[noname]");
+        fprintf(stderr, "readBytes(%d) read %d bytes from file '%s' offset %ld\n",
+            (int)len, (int)rdlen, FnameNVL(fname), (long)offs);
+        offs += rdlen;
         return rdlen;
     }
 
     size_t write(unsigned char *buff, size_t len) {
         if (fstate!=FiSt_PreOpened && fstate!=FiSt_Opened) {
             fprintf(stderr, "*** Write to closed file '%s' is not possible (len=%d)\n",
-                fname? fname: "[noname]", (int)len);
+                FnameNVL(fname), (int)len);
             return 0;
         }
         size_t wrlen= fwrite(buff, 1, len, file);
-        fprintf(stderr, "write(%d) has written %d bytes into '%s' file\n",
-            (int)len, (int)wrlen, fname? fname: "[noname]");
+        fprintf(stderr, "write(%d) has written %d bytes into '%s' file offset %ld\n",
+            (int)len, (int)wrlen, FnameNVL(fname), (long)offs);
+        offs += wrlen;
         return wrlen;
     }
 
     int close() {
         if (fstate==FiSt_PreOpened) {
             fprintf(stderr, "Stream.close *** don't close file '%s', it is preopened\n",
-                    fname? fname: "[noname]");
+                    FnameNVL(fname));
 
         } else if (fstate==FiSt_Opened) {
             fprintf(stderr, "Stream.closing file '%s'-t\n",
-                    fname? fname: "[noname]");
+                    FnameNVL(fname));
             fclose(file);
             file= NULL;
             fstate= FiSt_NotOpened;
+            offs= 0;
 
         } else if (fstate==FiSt_NotOpened) {
             fprintf(stderr, "Stream.close *** file '%s' is already closed or never has been opened)\n",
-                    fname? fname: "[noname]");
+                    FnameNVL(fname));
         }
         return 0;
     }
@@ -185,6 +197,8 @@ public:
                 fprintf(stderr, "*** Error in mkdir '%s' mode 0%o errno=%d: %s\n",
                     pathname, (int)mode, ern, strerror(ern));
             }
+        } else {
+            fprintf(stderr, "Directory '%s' has been created\n", pathname);
         }
         return rc;
     }
