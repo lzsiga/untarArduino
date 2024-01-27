@@ -10,6 +10,7 @@
  * Ported to Arduino library by Alexander Emelainov (a.m.emelianov@gmail.com), August 2017
  *  https://github.com/emelianov/untarArduino
  *
+ * Minor fixes by Zsigmond Lorinczy, January, 2024.
  */
 
 // Uncomment following definition to enable not flat namespace filesystems
@@ -154,11 +155,14 @@ void Tar<T>::create_dir(char *pathname, int mode)
 {
 	char *p;
 	int r;
+	int overwritten_slashes= 0;
 
-	/* Strip trailing '/' */
+	/* Strip trailing '/' (but don't make it empty) */
 	size_t len= pathname? strlen(pathname): 0;
-	if (len>0 && pathname[len-1] == '/')
-		pathname[len-1] = '\0';
+	while (len>=2 && pathname[len-1] == '/') {
+		++overwritten_slashes;
+		pathname[--len] = '\0';
+	}
 
 	/* Try creating the directory. */
 	r = FSC->mkdir(pathname, mode);
@@ -180,6 +184,9 @@ void Tar<T>::create_dir(char *pathname, int mode)
 		Serial.println("'");
         }
 #endif
+	for (int i= 0; i<overwritten_slashes; ++i) {
+		pathname[len++] = '/';
+	}
 }
 #endif
 
@@ -261,6 +268,10 @@ void Tar<T>::extract()
 			}
 			size_t fullpathlen= (pathprefix? strlen(pathprefix): 0)
 					  + strlen(buff) + 1;
+			if (fullpath) {
+				free(fullpath);
+				fullpath = NULL;
+			}
 			fullpath= (char *)malloc (fullpathlen);
 			if (fullpath == NULL) {
 				#ifndef TAR_SILENT
@@ -304,7 +315,7 @@ void Tar<T>::extract()
 					Serial.print("- Extracting dir ");
 					Serial.println(buff);
 					#endif
-					create_dir(buff, parseoct(buff + 100, 8));
+					create_dir(fullpath, parseoct(buff + 100, 8));
 					#else
 					#ifndef TAR_SILENT
 					Serial.print("- Ignoring dir ");
@@ -354,7 +365,7 @@ void Tar<T>::extract()
 			}
 			if (pending_filesize < 512)
 				bytes_read = pending_filesize;
-			if (f != NULL) {
+			if (f != NULL && f->isOpen()) {
 				if (f->write((uint8_t*)buff, bytes_read) != bytes_read) {
 					#ifndef TAR_SILENT
 					Serial.println(" - Failed write");
@@ -376,7 +387,7 @@ void Tar<T>::extract()
 			#ifndef TAR_SILENT
 			Serial.println();
 			#endif
-			f->close();
+			if (f->isOpen()) f->close();
 			delete f;
 			f = NULL;
 		}
