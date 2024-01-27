@@ -8,9 +8,13 @@
 static struct {
     const char *progname;
     const char *prefix;
+    const char *logfile;
+    int msglevel;
 } var= {
     NULL,
-    "./"
+    "./",
+    NULL,
+    1
 };
 
 static void Test1(const char *fname);
@@ -22,9 +26,14 @@ int main(int argc, char **argv) {
     if (argc>1) {
         int i;
 
+        if (var.logfile) {
+            FILE *f= fopen(var.logfile, "w");
+            if (f) debugfile= f;
+        }
         for (i=1; i<argc; ++i) {
             Test1(argv[i]);
         }
+        if (debugfile) fclose(debugfile);
     } else {
         fprintf(stderr, "usage: %s <filename> ...\n", var.progname);
     }
@@ -32,9 +41,9 @@ int main(int argc, char **argv) {
 }
 
 static void Test1(const char *fname) {
-    fprintf(stderr, "Now trying '%s'\n", fname);
+    fprintf(stderr, "\nTest1: Now trying '%s'\n", fname);
 
-    Tar<FS> tar(&SPIFFS);
+    Tar<FS> tar(&SPIFFS, var.msglevel);
 
     File f= SPIFFS.open(fname, "r");
     if (!f) {
@@ -63,6 +72,26 @@ static void ParseArgs (int *pargc, char ***pargv)
         case 0: case '-':
             --argc, ++argv;
             goto NO_MORE_OPT;
+
+        case 'l': case 'L':
+            if (strcasecmp (argv[0], "-logfile")==0) {
+                if (argc<2) goto OPTNVAL;
+                --argc;
+                ++argv;
+                var.logfile= argv[0][0] ? argv[0]: NULL;
+                break;
+
+            } else goto UNKOPT;
+
+        case 'm': case 'M':
+            if (strcasecmp (argv[0], "-msglevel")==0) {
+                if (argc<2) goto OPTNVAL;
+                --argc;
+                ++argv;
+                var.msglevel= atoi(argv[0]);
+                break;
+
+            } else goto UNKOPT;
 
         case 'p': case 'P':
             if (strcasecmp (argv[0], "-prefix")==0) {

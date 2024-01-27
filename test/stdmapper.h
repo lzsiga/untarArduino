@@ -18,6 +18,8 @@ enum FileState {FiSt_NotOpened, FiSt_OpenFailed, FiSt_PreOpened, FiSt_Opened};
 
 #define FnameNVL(fname) ((fname)? (fname): "[noname]")
 
+FILE *debugfile= stderr;
+
 class Stream {
 private:
     FILE *file;
@@ -42,7 +44,7 @@ public:
 
     ~Stream() {
         if (fstate==FiSt_Opened) {
-            fprintf(stderr, "Stream.destructor *** file '%s' has never been closed\n",
+            fprintf(debugfile, "Stream.destructor *** file '%s' has never been closed\n",
                     FnameNVL(fname));
             fclose(file);
             file= NULL;
@@ -83,7 +85,7 @@ public:
 
     size_t readBytes(char *buff, size_t len) {
         size_t rdlen= fread(buff, 1, len, file);
-        fprintf(stderr, "readBytes(%d) read %d bytes from file '%s' offset %ld\n",
+        fprintf(debugfile, "readBytes(%d) read %d bytes from file '%s' offset %ld\n",
             (int)len, (int)rdlen, FnameNVL(fname), (long)offs);
         offs += rdlen;
         return rdlen;
@@ -91,12 +93,12 @@ public:
 
     size_t write(unsigned char *buff, size_t len) {
         if (fstate!=FiSt_PreOpened && fstate!=FiSt_Opened) {
-            fprintf(stderr, "*** Write to closed file '%s' is not possible (len=%d)\n",
+            fprintf(debugfile, "*** Write to closed file '%s' is not possible (len=%d)\n",
                 FnameNVL(fname), (int)len);
             return 0;
         }
         size_t wrlen= fwrite(buff, 1, len, file);
-        fprintf(stderr, "write(%d) has written %d bytes into '%s' file offset %ld\n",
+        fprintf(debugfile, "write(%d) has written %d bytes into '%s' file offset %ld\n",
             (int)len, (int)wrlen, FnameNVL(fname), (long)offs);
         offs += wrlen;
         return wrlen;
@@ -104,11 +106,11 @@ public:
 
     int close() {
         if (fstate==FiSt_PreOpened) {
-            fprintf(stderr, "Stream.close *** don't close file '%s', it is preopened\n",
+            fprintf(debugfile, "Stream.close *** don't close file '%s', it is preopened\n",
                     FnameNVL(fname));
 
         } else if (fstate==FiSt_Opened) {
-            fprintf(stderr, "Stream.closing file '%s'-t\n",
+            fprintf(debugfile, "Stream.closing file '%s'-t\n",
                     FnameNVL(fname));
             fclose(file);
             file= NULL;
@@ -116,7 +118,7 @@ public:
             offs= 0;
 
         } else if (fstate==FiSt_NotOpened) {
-            fprintf(stderr, "Stream.close *** file '%s' is already closed or never has been opened)\n",
+            fprintf(debugfile, "Stream.close *** file '%s' is already closed or never has been opened)\n",
                     FnameNVL(fname));
         }
         return 0;
@@ -156,7 +158,7 @@ public:
       Stream(pfile, pfname, pfstate) {}
 };
 
-Stream Serial(stderr, "Serial-stderr", FiSt_PreOpened);
+Stream Serial(stderr, "Serial", FiSt_PreOpened);
 
 class FS {
 public:
@@ -167,11 +169,11 @@ public:
         FILE *f= fopen(name, mode);
         if (f==NULL) {
             int ern= errno;
-            fprintf(stderr, "*** Error opening file '%s' mode '%s' errno=%d: %s\n",
+            fprintf(debugfile, "*** Error opening file '%s' mode '%s' errno=%d: %s\n",
                     name, mode, ern, strerror(ern));
             return File(f, name, FiSt_NotOpened);
         } else {
-            fprintf(stderr, "File '%s' opened for mode '%s'\n",
+            fprintf(debugfile, "File '%s' opened for mode '%s'\n",
                     name, mode);
         }
         return File(f, name, FiSt_Opened);
@@ -188,17 +190,17 @@ public:
                 struct stat stbuf;
                 rc2= stat(pathname, &stbuf);
                 if (rc2==0 && S_ISDIR(stbuf.st_mode)) {
-                    fprintf(stderr, "Directory '%s' already exists, let's go on\n",
+                    fprintf(debugfile, "Directory '%s' already exists, let's go on\n",
                         pathname);
                     rc= 0;
                 }
             }
             if (rc!=0) {
-                fprintf(stderr, "*** Error in mkdir '%s' mode 0%o errno=%d: %s\n",
+                fprintf(debugfile, "*** Error in mkdir '%s' mode 0%o errno=%d: %s\n",
                     pathname, (int)mode, ern, strerror(ern));
             }
         } else {
-            fprintf(stderr, "Directory '%s' has been created\n", pathname);
+            fprintf(debugfile, "Directory '%s' has been created\n", pathname);
         }
         return rc;
     }
