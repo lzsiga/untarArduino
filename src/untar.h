@@ -74,7 +74,7 @@ private:
 	char buff[512];
 	File *f = NULL;
 	size_t bytes_read = 0;
-	int filesize = 0;
+	size_t pending_filesize = 0;
 	tar_state _state = TAR_IDLE;
 };
 #ifdef TAR_CALLBACK
@@ -116,7 +116,7 @@ void Tar<T>::dest(const char* path){
 template <typename T>
 void Tar<T>::open(Stream* src){
 	source = src;
-	filesize = 0;
+	pending_filesize = 0;
 	_state = TAR_IDLE;
 }
 
@@ -156,8 +156,9 @@ void Tar<T>::create_dir(char *pathname, int mode)
 	int r;
 
 	/* Strip trailing '/' */
-	if (pathname[strlen(pathname) - 1] == '/')
-		pathname[strlen(pathname) - 1] = '\0';
+	size_t len= pathname? strlen(pathname): 0;
+	if (len>0 && pathname[len-1] == '/')
+		pathname[len-1] = '\0';
 
 	/* Try creating the directory. */
 	r = FSC->mkdir(pathname, mode);
@@ -223,7 +224,7 @@ void Tar<T>::extract()
 {
 	char* fullpath = NULL;
 	#ifndef TAR_SILENT
-	if (filesize == 0) {
+	if (pending_filesize == 0) {
 		Serial.println("\nExtracting tar");
 	} else {
 		Serial.println("Resume file extraction");
@@ -243,7 +244,7 @@ void Tar<T>::extract()
 			_state = TAR_SHORT_READ;
 			goto RETURN;
 		}
-		if (filesize == 0) {
+		if (pending_filesize == 0) {
 			if (is_end_of_archive(buff)) {
 				#ifndef TAR_SILENT
 				Serial.println("End of source file");
@@ -267,7 +268,7 @@ void Tar<T>::extract()
 				#endif
 			} else {
 				_state = TAR_IDLE;
-				//filesize = parseoct(buff + 124, 12);
+				//pending_filesize = parseoct(buff + 124, 12);
 				fullpath[0]= '\0';
 				if (pathprefix) strcpy (fullpath, pathprefix);
 				strcat (fullpath, buff);
@@ -297,7 +298,7 @@ void Tar<T>::extract()
 					#endif
 					break;
 				case '5':
-					filesize = 0;
+					pending_filesize = 0;
 					#ifdef TAR_MKDIR
 					#ifndef TAR_SILENT
 					Serial.print("- Extracting dir ");
@@ -322,7 +323,7 @@ void Tar<T>::extract()
 					Serial.print("- Extracting file ");
 					Serial.print(buff);
 					#endif
-					filesize = parseoct(buff + 124, 12);
+					pending_filesize = parseoct(buff + 124, 12);
 					_state = TAR_FILE_EXTRACT;
 					#ifdef TAR_CALLBACK
 					if (cbProcess == NULL || cbProcess(buff))
@@ -337,7 +338,7 @@ void Tar<T>::extract()
 			}
 			bytes_read = 0;
 		}
-		while (filesize > 0) {
+		while (pending_filesize > 0) {
 			#ifndef TAR_SILENT
 			Serial.print(".");
 			#endif
@@ -351,8 +352,8 @@ void Tar<T>::extract()
 				_state = TAR_SHORT_READ;
 				goto RETURN;
 			}
-			if (filesize < 512)
-				bytes_read = filesize;
+			if (pending_filesize < 512)
+				bytes_read = pending_filesize;
 			if (f != NULL) {
 				if (f->write((uint8_t*)buff, bytes_read) != bytes_read) {
 					#ifndef TAR_SILENT
@@ -368,7 +369,7 @@ void Tar<T>::extract()
 			if (cbData != NULL)
 				cbData(buff, bytes_read);
 			#endif
-			filesize -= bytes_read;
+			pending_filesize -= bytes_read;
 			bytes_read = 0;
 		}
 		if (f != NULL) {
