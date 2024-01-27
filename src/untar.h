@@ -259,6 +259,15 @@ void Tar<T>::extract()
 		} else {
 			bytes_read = source->readBytes(buff, 512);
 		}
+		if (bytes_read == 0 && pending_filesize == 0) {
+			#ifndef TAR_SILENT
+			if (msglevel>=2) {
+				Serial.println("End of source file");
+			}
+			#endif
+			_state = TAR_SOURCE_EOF;
+			goto RETURN;
+		}
 		if (bytes_read < 512) {
 			#ifndef TAR_SILENT
 			if (msglevel>=1) {
@@ -396,7 +405,7 @@ void Tar<T>::extract()
 			}
 			#endif
 			if (bytes_read == 0)
-			bytes_read = source->readBytes(buff, 512);
+				bytes_read = source->readBytes(buff, 512);
 			if (bytes_read < 512) {
 				#ifndef TAR_SILENT
 				if (msglevel>=1) {
