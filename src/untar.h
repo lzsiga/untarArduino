@@ -16,7 +16,12 @@
 // Uncomment following definition to enable not flat namespace filesystems
 //#define TAR_MKDIR
 
-// Unomment to suppress output extracting process messages to Serial
+// Defining TAR_SILENT spares memory space but completely disables debug-messages
+// if you don't wish so, use the second parameter instead (int 0+)
+// 0= no messages at all
+// 1= errors only
+// 2= information too
+// 3= also process bar (a dot per 512 bytes)
 //#define TAR_SILENT
 
 // Comment to remove callback support
@@ -41,14 +46,15 @@ typedef void (*cbTarEof)();
 template <typename T>
 class Tar {
 public:
-	Tar(T* dst) {
+	Tar(T* dst, int pmsglevel= 1) {
 		FSC = dst;
 		pathprefix = NULL;
+		msglevel = pmsglevel;
 	}
 	~Tar() {
 		if (pathprefix) free(pathprefix);
 	}
-	void dest(const char* path);	// Set directory extract to. tar -C  
+	void dest(const char* path);	// Set directory extract to. tar -C
 	void open(Stream* src);		// Source stream. Can use (Stream*)File as source
 	void extract();			// Extract a tar archive
 	#ifdef TAR_CALLBACK
@@ -57,7 +63,8 @@ public:
 	void onEof(cbTarEof cb);	// Sets callback that executed on each file end
 	#endif
 private:
-	char* pathprefix;		// Stores filename prefix to be added to each file
+	int msglevel;			// Note: it has no use if 'TAR_SILENT' is defined
+	char* pathprefix;		// Stores filename prefix to be added to each file/directory
 	int parseoct(const char *p, size_t n);		// Parse an octal number, ignoring leading and trailing nonsense.
 	int is_end_of_archive(const char *p);		// Returns true if this is 512 zero bytes.
 	#ifdef TAR_MKDIR
@@ -67,6 +74,7 @@ private:
 	int verify_checksum(const char *p);		// Verify the tar checksum.
 	T* FSC;						// FS object
 	Stream* source;					// Source stream
+	void *emalloc(size_t size);
 	#ifdef TAR_CALLBACK
 	cbTarProcess cbProcess = NULL;			// bool cbExclude(filename) calback. Return 'false' means skip file creation then
 	cbTarData cbData = NULL;			// cbNull(data, size) callback. Called for each data block if file creation was skipped.
@@ -102,14 +110,9 @@ void Tar<T>::dest(const char* path){
 		pathprefix= NULL;
 	}
 	if (path && *path) {
-		pathprefix = (char*)malloc (strlen(path) + 1);
+		pathprefix = (char*)emalloc (strlen(path) + 1);
 		if (pathprefix != NULL) {
 			strcpy (pathprefix, path);
-		} else {
-			#ifndef TAR_SILENT
-			Serial.println("Memory allocation error");
-			#endif
-			pathprefix= NULL;
 		}
 	}
 }
@@ -178,7 +181,7 @@ void Tar<T>::create_dir(char *pathname, int mode)
 		}
 	}
 #ifndef TAR_SILENT
-	if (r != 0) {
+	if (r != 0 && msglevel>=1) {
 		Serial.print("Could not create directory '");
 		Serial.print(pathname);
 		Serial.println("'");
@@ -189,6 +192,17 @@ void Tar<T>::create_dir(char *pathname, int mode)
 	}
 }
 #endif
+
+template <typename T>
+void *Tar<T>::emalloc(size_t size) {
+	void *p= malloc(size);
+#ifndef TAR_SILENT
+	if (!p && msglevel>=1) {
+		Serial.println("Memory allocation error");
+	}
+#endif
+	return p;
+}
 
 template <typename T>
 File* Tar<T>::create_file(char *pathname)
@@ -231,10 +245,12 @@ void Tar<T>::extract()
 {
 	char* fullpath = NULL;
 	#ifndef TAR_SILENT
-	if (pending_filesize == 0) {
-		Serial.println("\nExtracting tar");
-	} else {
-		Serial.println("Resume file extraction");
+	if (msglevel>=2) {
+		if (pending_filesize == 0) {
+			Serial.println("\nExtracting tar");
+		} else {
+			Serial.println("Resume file extraction");
+		}
 	}
 	#endif
 	for (;;) {
@@ -245,8 +261,10 @@ void Tar<T>::extract()
 		}
 		if (bytes_read < 512) {
 			#ifndef TAR_SILENT
-			Serial.print(" * Short read: expected 512, got ");
-			Serial.println(bytes_read);
+			if (msglevel>=1) {
+				Serial.print(" * Short read: expected 512, got ");
+				Serial.println(bytes_read);
+			}
 			#endif
 			_state = TAR_SHORT_READ;
 			goto RETURN;
@@ -254,14 +272,18 @@ void Tar<T>::extract()
 		if (pending_filesize == 0) {
 			if (is_end_of_archive(buff)) {
 				#ifndef TAR_SILENT
-				Serial.println("End of source file");
+				if (msglevel>=2) {
+					Serial.println("End of source file");
+				}
 				#endif
 				_state = TAR_SOURCE_EOF;
 				goto RETURN;
 			}
 			if (!verify_checksum(buff)) {
 				#ifndef TAR_SILENT
-				Serial.println("* Checksum failure");
+				if (msglevel>=1) {
+					Serial.println("* Checksum failure");
+				}
 				#endif
 				_state = TAR_CHECKSUM_MISMACH;
 				goto RETURN;
@@ -275,7 +297,9 @@ void Tar<T>::extract()
 			fullpath= (char *)malloc (fullpathlen);
 			if (fullpath == NULL) {
 				#ifndef TAR_SILENT
-				Serial.println("* Memory allocation error. Ignoring entry");
+				if (msglevel>=1) {
+					Serial.println("* Memory allocation error. Ignoring entry");
+				}
 				#endif
 			} else {
 				_state = TAR_IDLE;
@@ -286,53 +310,69 @@ void Tar<T>::extract()
 				switch (buff[156]) {
 				case '1':
 					#ifndef TAR_SILENT
-					Serial.print("- Ignoring hardlink ");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Ignoring hardlink ");
+						Serial.println(buff);
+					}
 					#endif
 					break;
 				case '2':
 					#ifndef TAR_SILENT
-					Serial.print("- Ignoring symlink");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Ignoring symlink");
+						Serial.println(buff);
+					}
 					#endif
 					break;
 				case '3':
 					#ifndef TAR_SILENT
-					Serial.print("- Ignoring character device");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Ignoring character device");
+						Serial.println(buff);
+					}
 					#endif
 					break;
 				case '4':
 					#ifndef TAR_SILENT
-					Serial.print("- Ignoring block device");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Ignoring block device");
+						Serial.println(buff);
+					}
 					#endif
 					break;
 				case '5':
 					pending_filesize = 0;
 					#ifdef TAR_MKDIR
 					#ifndef TAR_SILENT
-					Serial.print("- Extracting dir ");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Extracting dir ");
+						Serial.println(buff);
+					}
 					#endif
 					create_dir(fullpath, parseoct(buff + 100, 8));
 					#else
 					#ifndef TAR_SILENT
-					Serial.print("- Ignoring dir ");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Ignoring dir ");
+						Serial.println(buff);
+					}
 					#endif
 					#endif
 					break;
 				case '6':
 					#ifndef TAR_SILENT
-					Serial.print("- Ignoring FIFO ");
-					Serial.println(buff);
+					if (msglevel>=2) {
+						Serial.print("- Ignoring FIFO ");
+						Serial.println(buff);
+					}
 					#endif
 					break;
 				default:
 					#ifndef TAR_SILENT
-					Serial.print("- Extracting file ");
-					Serial.print(buff);
+					if (msglevel>=2) {
+						Serial.print("- Extracting file ");
+						Serial.print(buff);
+					}
 					#endif
 					pending_filesize = parseoct(buff + 124, 12);
 					_state = TAR_FILE_EXTRACT;
@@ -351,14 +391,18 @@ void Tar<T>::extract()
 		}
 		while (pending_filesize > 0) {
 			#ifndef TAR_SILENT
-			Serial.print(".");
+			if (msglevel>=3) {
+				Serial.print(".");
+			}
 			#endif
 			if (bytes_read == 0)
 			bytes_read = source->readBytes(buff, 512);
 			if (bytes_read < 512) {
 				#ifndef TAR_SILENT
-				Serial.print("Data short read: Expected 512, got ");
-				Serial.println(bytes_read);
+				if (msglevel>=1) {
+					Serial.print("Data short read: Expected 512, got ");
+					Serial.println(bytes_read);
+				}
 				#endif
 				_state = TAR_SHORT_READ;
 				goto RETURN;
@@ -368,7 +412,9 @@ void Tar<T>::extract()
 			if (f != NULL && f->isOpen()) {
 				if (f->write((uint8_t*)buff, bytes_read) != bytes_read) {
 					#ifndef TAR_SILENT
-					Serial.println(" - Failed write");
+					if (msglevel>=1) {
+						Serial.println(" - Failed write");
+					}
 					#endif
 					_state = TAR_WRITE_ERROR;
 					f->close();
@@ -385,7 +431,9 @@ void Tar<T>::extract()
 		}
 		if (f != NULL) {
 			#ifndef TAR_SILENT
-			Serial.println();
+			if (msglevel>=2) {
+				Serial.println();
+			}
 			#endif
 			if (f->isOpen()) f->close();
 			delete f;
@@ -405,7 +453,9 @@ void Tar<T>::extract()
 RETURN:
 	if (f != NULL) {
 		#ifndef TAR_SILENT
-		Serial.println();
+		if (msglevel>=2) {
+			Serial.println();
+		}
 		#endif
 		f->close();
 		delete f;
